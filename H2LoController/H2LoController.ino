@@ -5,6 +5,8 @@
  by Franz Garsombke
  
  */
+#include "Structures.h"
+#include "Utils.h"
 #include <SPI.h>
 #include <Ethernet.h>
 #include <aJSON.h>
@@ -28,12 +30,6 @@ const int networkTimeout = 30*1000;
 // Number of milliseconds to wait if no data is available before trying again
 const int networkDelay = 1000;
 String jsonResponse = "";
-// structure to hold JSON Device
-struct Device
-{
-  String pin;
-  int id;
-};
 
 void setup() {
   // start serial port:
@@ -141,7 +137,7 @@ void loop() {
   char* jsonString = (char*) malloc(sizeof(char)*(jsonResponse.length()+1));
   jsonResponse.toCharArray(jsonString, jsonResponse.length() + 1);
   printFreeMemory("Before parsing");  
-  struct Device device = parseJson(jsonString);
+  Device device = parseDevice(jsonString);
   if (true) {
     Serial.print("Successfully Parsed pin:");
     Serial.println(device.pin);
@@ -153,39 +149,5 @@ void loop() {
   printFreeMemory("After parsing");  
   // And just stop, now that we've tried a download
   while(1);
-}
-
-/**
- * Parse the JSON String. Uses aJson library
- * 
- * Refer to http://hardwarefun.com/tutorials/parsing-json-in-arduino
- */
-struct Device parseJson(char *jsonString) {
-  struct Device myDevice;
-  Serial.println("Parsing JSON");
-  aJsonObject* root = aJson.parse(jsonString);
-  if (root != NULL) {
-    Serial.println("Parsed successfully root." );
-    aJsonObject* pin = aJson.getObjectItem(root, "pin"); 
-    if (pin != NULL) {
-      myDevice.pin = pin->valuestring;
-    }
-    aJsonObject* id = aJson.getObjectItem(root, "id"); 
-    if (id != NULL) {
-      myDevice.id = id->valueint;
-    }
-  }
-  return myDevice;
-}
-
-/**
- * Print the Free memory along with a message in the Serial window
- *
- * Uses MemoryFree library - https://github.com/sudar/MemoryFree
- */
-void printFreeMemory(char* message) {
- Serial.print(message);
- Serial.print(":\t");
- Serial.println(getFreeMemory());
 }
 
