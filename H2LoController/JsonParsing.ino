@@ -7,9 +7,13 @@ struct Device parseDevice(char *jsonString) {
   struct Device myDevice;
   Serial.println("Parsing JSON");
   aJsonObject* root = aJson.parse(jsonString);
+  Serial.print("type of root:" );
+  Serial.println(root->type);
   if (root != NULL) {
     Serial.println("Parsed successfully root." );
     aJsonObject* pin = aJson.getObjectItem(root, "pin"); 
+    Serial.print("type of pin:" );
+    Serial.println(pin->type);
     if (pin != NULL) {
       myDevice.pin = pin->valuestring;
     }

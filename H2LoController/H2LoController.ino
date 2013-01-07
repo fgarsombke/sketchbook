@@ -6,18 +6,18 @@
  
  */
 #include "Structures.h"
-#include "Utils.h"
 #include <SPI.h>
 #include <Ethernet.h>
 #include <aJSON.h>
 #include <HttpClient.h>
 #include <b64.h>
 #include <MemoryFree.h>
+#include <PubSubClient.h>
 
 char server[] = "h2lo-api.herokuapp.com";
 // Path to download (this is the bit after the hostname in the URL
 // that you want to download
-const char path[] = "/service/device/1";
+const char path[] = "/service/device";
 // Enter a MAC address for your controller below.
 // Newer Ethernet shields have a MAC address printed on a sticker on the shield
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
