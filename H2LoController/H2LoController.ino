@@ -10,7 +10,6 @@
 #include <MemoryFree.h>
 #include <PubSubClient.h>
 
-<<<<<<< HEAD
 #define MQTT_SERVER "m2m.eclipse.org"
 #define M2MIO_USERNAME   ""
 #define M2MIO_PASSWORD   ""
@@ -19,16 +18,7 @@
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
 #define MQTT_KEEPALIVE 5
 char jsonDeviceString[] = "{\"id\":1,\"pin\":\"12345\"}";
-
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
-=======
-char server[] = "h2lo-api.herokuapp.com";
-// Path to download (this is the bit after the hostname in the URL
-// that you want to download
-const char path[] = "/service/device/1";
-// Enter a MAC address for your controller below.
-// Newer Ethernet shields have a MAC address printed on a sticker on the shield
->>>>>>> 45dfc68307042e26197ad063bd10469c739c85b1
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 EthernetClient ethernetClient;
 String jsonResponse = "";
