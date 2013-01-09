@@ -10,9 +10,42 @@
 #include <MemoryFree.h>
 #include <PubSubClient.h>
 
+// zone to pin mapping
+int zone1 = 2; //pin 2
+int zone2 = 3; //pin 3
+int zone3 = 4; //pin 4
+int zone4 = 5; //pin 5
+int zone5 = 6; //pin 6
+int zone6 = 7; //pin 7
+int zone7 = 8; //pin 8
+int zone8 = 9; //pin 9
+
+int zone9  = A0; //pin A0
+int zone10 = A1; //pin A1
+int zone11 = A2; //pin A2
+int zone12 = A3; //pin A3
+
+// LED indicator pin variables
+int ledIndicator = 13;
+int ledState = LOW;
+unsigned long ledFlashTimer = 0;       // timer for LED in milliseconds
+unsigned long ledFlashInterval = 1000; // flash interval in milliseconds
+
+// set the maximum run time for a zone (safeguard)
+unsigned long MAX_RUN_TIME_MINUTES = 30;  // Default 30 minutes
+unsigned long MAX_RUN_TIME = MAX_RUN_TIME_MINUTES * 60000;
+
+int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8, zone9, zone10, zone11, zone12};
+
+int zoneCount = 12;
+
+const int CR_PIN_ID     = 0;
+const int CR_END_TIME   = 1;
+const int CR_ZONE_ID    = 2;
+const int CR_START_TIME = 3;
+
 #define MQTT_SERVER "m2m.eclipse.org"
 #define M2MIO_USERNAME   ""
-#define M2MIO_PASSWORD   ""
 #define M2MIO_PASSWORD   ""
 #define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
@@ -57,20 +90,31 @@ void setup() {
   Serial.println(topic);    
   Serial.println("connecting pub sub client");
   pubSubClient.connect(M2MIO_DEVICE_ID);
-  pubSubClient.subscribe(topic);      
+  pubSubClient.subscribe(topic);  
+
+  //Set relay pins to output
+  for (int i = 0; i < zoneCount; i++){
+    pinMode(zones[i], OUTPUT);
+  }
+  // does not work
+  //pinMode(ledIndicator, OUTPUT);
 }
 
 void loop() {
-   if (!pubSubClient.connected()) {
-      // clientID, username, MD5 encoded password
-      Serial.println("re-connecting pub sub client");
-      pubSubClient.connect(M2MIO_DEVICE_ID);
-      pubSubClient.subscribe(topic);      
-    }
-    // MQTT client loop processing
-    pubSubClient.loop();
-    pubSubClient.publish(topic, jsonDeviceString);
-    delay(5000);    
+  // check on timed runs, shutdown expired runs
+  checkTimedRun();
+  // turn on the LED indicator light - does not work?
+  //digitalWrite(ledIndicator, HIGH);  // set the LED on
+  if (!pubSubClient.connected()) {
+    Serial.println("re-connecting pub sub client");
+    pubSubClient.connect(M2MIO_DEVICE_ID);
+    pubSubClient.subscribe(topic);      
+  }
+  // MQTT client loop processing
+  pubSubClient.loop();
+  pubSubClient.publish(topic, jsonDeviceString);
+  pubSubClient.publish("arduino/h2loapi", jsonDeviceString);
+  delay(1000);
 }
 
 // handles message arrived on subscribed topic(s)
