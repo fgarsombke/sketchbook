@@ -56,7 +56,8 @@ byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 EthernetClient ethernetClient;
 String jsonResponse = "";
 char clientID[50];
-char topic[50];
+char subscribeTopic[50];
+char publishTopic[50];
 char msg[50];
 char message_buff[100];
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
@@ -83,14 +84,14 @@ void setup() {
   Serial.println("connected to Ethernet...");
   printFreeMemory("After Setup"); 
  
-  String topicStr = "arduino/";
-  topicStr.concat("h2lo");
-  topicStr.toCharArray(topic, topicStr.length()+1);
-  Serial.print("topic:");
-  Serial.println(topic);    
+  String subscribeTopicStr = "arduino/";
+  subscribeTopicStr.concat("h2lo/device/1");
+  subscribeTopicStr.toCharArray(subscribeTopic, subscribeTopicStr.length()+1);
+  Serial.print("subscribeTopic:");
+  Serial.println(subscribeTopic);    
   Serial.println("connecting pub sub client");
   pubSubClient.connect(M2MIO_DEVICE_ID);
-  pubSubClient.subscribe(topic);  
+  pubSubClient.subscribe(subscribeTopic);  
 
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
@@ -102,18 +103,16 @@ void setup() {
 
 void loop() {
   // check on timed runs, shutdown expired runs
-  checkTimedRun();
+  //checkTimedRun();
   // turn on the LED indicator light - does not work?
   //digitalWrite(ledIndicator, HIGH);  // set the LED on
   if (!pubSubClient.connected()) {
     Serial.println("re-connecting pub sub client");
     pubSubClient.connect(M2MIO_DEVICE_ID);
-    pubSubClient.subscribe(topic);      
+    pubSubClient.subscribe(subscribeTopic);      
   }
   // MQTT client loop processing
   pubSubClient.loop();
-  pubSubClient.publish(topic, jsonDeviceString);
-  pubSubClient.publish("arduino/h2loapi", jsonDeviceString);
   delay(1000);
 }
 
@@ -131,7 +130,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Payload:");
   Serial.print(msgString);
   Serial.println(":");
-  printFreeMemory("memory before parsing"); 
+  printFreeMemory("memory before parsing");
+  pubSubClient.publish("arduino/h2lo/api/1", "arduino status has changed"); 
   // Run out of memory after 4 parses!!! 
   /*
   Device device = parseDevice(message_buff);
