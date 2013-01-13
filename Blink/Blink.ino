@@ -11,18 +11,32 @@
  *
  * based on an orginal by H. Barragan for the Wiring i/o board
  */
+int zone1 = 2; //pin 2
+int zone2 = 3; //pin 3
+int zone3 = 4; //pin 4
+int zone4 = 5; //pin 5
+int zone5 = 6; //pin 6
+int zone6 = 7; //pin 7
+int zone7 = 8; //pin 8
+int zone8 = 9; //pin 9
 
-int ledPin = 13;                // LED connected to digital pin 13
+int zoneCount = 8;
+int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
 
 void setup()
 {
-  pinMode(ledPin, OUTPUT);      // sets the digital pin as output
+  //Set relay pins to output
+  for (int i = 0; i < zoneCount; i++){
+    pinMode(zones[i], OUTPUT);
+  }
 }
 
 void loop()
 {
-  digitalWrite(ledPin, HIGH);   // sets the LED on
-  delay(1000);                  // waits for a second
-  digitalWrite(ledPin, LOW);    // sets the LED off
-  delay(1000);                  // waits for a second
+  //Set relay pins to output
+  for (int i = 0; i < zoneCount; i++){
+    digitalWrite(zones[i], HIGH);   // sets the LED on
+    delay(500);                  // waits for a second
+    digitalWrite(zones[i], LOW);    // sets the LED off
+  }
 }

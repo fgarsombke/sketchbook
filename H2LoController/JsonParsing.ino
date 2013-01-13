@@ -1,22 +1,19 @@
-/**
- * Parse the JSON String. Uses aJson library
- * 
- * Refer to http://hardwarefun.com/tutorials/parsing-json-in-arduino
- */
-struct Device parseDevice(char *jsonString) {
-  struct Device myDevice;
-  Serial.println("Parsing JSON");
-  aJsonObject* root = aJson.parse(jsonString);
-  if (root != NULL) {
-    Serial.println("Parsed successfully root." );
-    aJsonObject* pin = aJson.getObjectItem(root, "pin"); 
-    if (pin != NULL) {
-      myDevice.pin = pin->valuestring;
-    }
-    aJsonObject* id = aJson.getObjectItem(root, "id"); 
-    if (id != NULL) {
-      myDevice.id = id->valueint;
-    }
-  }
-  return myDevice;
+struct Zone parseZone(String zoneJson) {
+  // {id:3,zoneStatus:ON}
+  struct Zone myZone;
+  Serial.println("Parsing JSON Zone");
+  String id = zoneJson.substring(zoneJson.indexOf("id") +3,zoneJson.indexOf(','));
+  Serial.println("id:" + id);
+  myZone.id = id.toInt();
+  String zoneStatus = zoneJson.substring(zoneJson.indexOf("zoneStatus") +11, zoneJson.indexOf('}'));
+  Serial.println("zoneStatus:" + zoneStatus);
+  myZone.zoneStatus = zoneStatus;
+  return myZone;
+}
+
+String getCommand(String topic) {
+  Serial.println("getCommand.");
+  String command = topic.substring(topic.lastIndexOf('/') +1,topic.length());
+  Serial.println("command:" + command);
+  return command;
 }
