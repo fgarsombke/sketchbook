@@ -115,7 +115,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   jsonResponse = String(message_buff);
   currentCommand = getCommand(String(topic));
   printFreeMemory("memory after buffer");
-  pubSubClient.publish("arduino/h2lo/api/1", "arduino status has changed");
 }
 
 void changeZoneStatus(Zone zone) {
@@ -123,5 +122,11 @@ void changeZoneStatus(Zone zone) {
     digitalWrite(zone.id +1, HIGH);
   } else {
     digitalWrite(zone.id +1, LOW);
-  } 
+  }
+  char pubMsg[50]; 
+  String pubMsgStr = "arduino/";
+  pubMsgStr.concat("h2lo/device/3/+");
+  pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
+  //"zone " + zone.id + " is now " + zone.z
+  pubSubClient.publish("arduino/h2lo/api/1", pubMsg);
 }
