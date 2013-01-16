@@ -9,29 +9,12 @@
 #include <MemoryFree.h>
 #include <PubSubClient.h>
 
-int zone1 = 2; //pin 2
-int zone2 = 3; //pin 3
-int zone3 = 4; //pin 4
-int zone4 = 5; //pin 5
-int zone5 = 6; //pin 6
-int zone6 = 7; //pin 7
-int zone7 = 8; //pin 8
-int zone8 = 9; //pin 9
-
 // Server Commands
 const String CMD_UPDATE_ZONE_STATUS = "updateZoneStatus";
-int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
-int zoneCount = 8;
-#define MQTT_SERVER "m2m.eclipse.org"
-#define M2MIO_USERNAME   ""
-#define M2MIO_PASSWORD   ""
-#define M2MIO_DOMAIN     ""
-#define M2MIO_DEVICE_ID "arduino-h2lo-device"
-#define MQTT_KEEPALIVE 5
-char jsonDeviceString[] = "{\"id\":\"1\",\"zoneStatus\":\"12345\"}";
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 EthernetClient ethernetClient;
+EthernetServer server(80);  
 String jsonResponse = "";
 char subscribeTopic[50];
 char publishTopic[50];
@@ -48,21 +31,15 @@ void setup() {
   // give the ethernet module time to boot up:
   delay(1000);
   printFreeMemory("initial memory");
-  // start the Ethernet connection using a fixed IP address and DNS server:
-   // start the Ethernet connection:
-  if (Ethernet.begin(mac) == 0) {
-    Serial.println("Failed to configure Ethernet using DHCP");
-    // no point in carrying on, so do nothing forevermore:
-    for(;;)
-      ;
-  }
+  IPAddress ip(192,168,1, 177);
+  Ethernet.begin(mac, ip);
+  // Start the weberver
+  server.begin();
   // give the Ethernet shield a second to initialize:
   delay(1000);
-  Serial.println("connecting to ethernet...");
   // print the Ethernet board/shield's IP address:
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
-  Serial.println("connected to Ethernet...");
   printFreeMemory("After Setup memory"); 
   String subscribeTopicStr = "arduino/";
   subscribeTopicStr.concat("h2lo/device/3/+");
@@ -87,8 +64,8 @@ void loop() {
   // MQTT client loop processing
   pubSubClient.loop();
   delay(1000);
-  Serial.print("jsonResponse:");
-  Serial.println(jsonResponse);
+  //Serial.print("jsonResponse:");
+  //Serial.println(jsonResponse);
   if(jsonResponse != NULL) {
     Serial.println("Do Something!");
     if (currentCommand.compareTo(CMD_UPDATE_ZONE_STATUS) == 0) {
@@ -98,6 +75,7 @@ void loop() {
     }
     jsonResponse = NULL;
   }
+  consumeHttpRequest();
 }
 
 // handles message arrived on subscribed topic(s)
@@ -129,4 +107,61 @@ void changeZoneStatus(Zone zone) {
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
   //"zone " + zone.id + " is now " + zone.z
   pubSubClient.publish("arduino/h2lo/api/1", pubMsg);
+}
+
+void consumeHttpRequest() {
+  // Easy test:
+  // curl -X POST -d "name=foobar,email=xxx@xxx.com,ssid=12345" http://192.168.1.177
+  // listen for incoming clients
+  EthernetClient client = server.available();
+  if (client) {
+    Serial.println("new client");
+    // an http request ends with a blank line
+    boolean currentLineIsBlank = true;
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+        Serial.write(c);
+        // if you've gotten to the end of the line (received a newline
+        // character) and the line is blank, the http request has ended,
+        // so you can send a reply
+        if (c == '\n' && currentLineIsBlank) {
+          // this is to retrieve POST data
+          while(client.available()) {
+            char t = client.read();
+            Serial.print(t);
+          }              
+          Serial.println();
+          // send a standard http response header
+          client.println("HTTP/1.1 200 OK");
+          client.println("Content-Type: text/html");
+          client.println("Connnection: close");
+          client.println();
+          client.println("<!DOCTYPE HTML>");
+          client.println("<html>");
+          client.println("<form method=\"POST\">");
+          client.println("Username: <input type=\"text\" name=\"username\"><br>");
+          client.println("Email: <input type=\"text\" name=\"email\"><br>");
+          client.println("<input type=\"submit\" value=\"Submit\">");
+          client.println("</form>");
+          client.println("");       
+          client.println("</html>");
+          break;
+        }
+        if (c == '\n') {
+          // you're starting a new line
+          currentLineIsBlank = true;
+        } 
+        else if (c != '\r') {
+          // you've gotten a character on the current line
+          currentLineIsBlank = false;
+        }
+      }
+    }
+    // give the web browser time to receive the data
+    delay(1);
+    // close the connection:
+    client.stop();
+    Serial.println("client disonnected");
+  }
 }
