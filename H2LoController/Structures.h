@@ -27,7 +27,7 @@ int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
 int zoneCount = 8;
 
 // MQTT
-#define MQTT_SERVER "m2m.eclipse.org"
+#define MQTT_SERVER "broker.mqttdashboard.com"
 #define M2MIO_USERNAME   ""
 #define M2MIO_PASSWORD   ""
 #define M2MIO_DOMAIN     ""

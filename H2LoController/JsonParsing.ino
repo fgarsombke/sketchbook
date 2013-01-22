@@ -1,11 +1,11 @@
 struct Zone parseZone(String zoneJson) {
-  // {id:3,zoneStatus:ON}
+  // {"id":7,"status":"ON"}
   struct Zone myZone;
   Serial.println("Parsing JSON Zone");
-  String id = zoneJson.substring(zoneJson.indexOf("id") +3,zoneJson.indexOf(','));
+  String id = zoneJson.substring(zoneJson.indexOf("id") +4,zoneJson.indexOf(','));
   Serial.println("id:" + id);
   myZone.id = id.toInt();
-  String zoneStatus = zoneJson.substring(zoneJson.indexOf("zoneStatus") +11, zoneJson.indexOf('}'));
+  String zoneStatus = zoneJson.substring(zoneJson.indexOf("status") +9, zoneJson.indexOf('}') -1);
   Serial.println("zoneStatus:" + zoneStatus);
   myZone.zoneStatus = zoneStatus;
   return myZone;

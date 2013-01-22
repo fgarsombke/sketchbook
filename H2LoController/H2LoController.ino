@@ -41,8 +41,8 @@ void setup() {
   Serial.print("My IP address: ");
   Serial.println(Ethernet.localIP());
   printFreeMemory("After Setup memory"); 
-  String subscribeTopicStr = "arduino/";
-  subscribeTopicStr.concat("h2lo/device/3/+");
+  String subscribeTopicStr = "h2lo/";
+  subscribeTopicStr.concat("device/3/+");
   subscribeTopicStr.toCharArray(subscribeTopic, subscribeTopicStr.length()+1);
   Serial.print("subscribeTopic:");
   Serial.println(subscribeTopic);    
@@ -102,11 +102,16 @@ void changeZoneStatus(Zone zone) {
     digitalWrite(zone.id +1, LOW);
   }
   char pubMsg[50]; 
-  String pubMsgStr = "arduino/";
-  pubMsgStr.concat("h2lo/device/3/+");
+  //{"id":7,"status":"ON"}
+  String pubMsgStr = ("{\"id\":");
+  pubMsgStr.concat(zone.id);
+  pubMsgStr.concat(",\"status\":\"");
+  pubMsgStr.concat(zone.zoneStatus);
+  pubMsgStr.concat("\"}");
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
-  //"zone " + zone.id + " is now " + zone.z
-  pubSubClient.publish("arduino/h2lo/api/1", pubMsg);
+  Serial.print("publish message:");
+  Serial.println(pubMsg);
+  pubSubClient.publish("h2lo/cloud/3", pubMsg);
 }
 
 void consumeHttpRequest() {
