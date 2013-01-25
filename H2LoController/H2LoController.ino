@@ -10,16 +10,18 @@
 #include <PubSubClient.h>
 
 // Server Commands
-const String CMD_UPDATE_ZONE_STATUS = "updateZoneStatus";
+const String CMD_UPDATE_ZONE_STATUS = "UPDATE_ZONE_STATUS";
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 EthernetClient ethernetClient;
 EthernetServer server(80);  
 String jsonResponse = "";
-char subscribeTopic[50];
-char publishTopic[50];
+char subscribeTopic[30];
+char publishTopic[30];
+char pubMsg[50];
 char msg[50];
-char message_buff[100];
+char message_buff[50];
+char email_buff[50];
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
 int zoneId;
 String currentCommand;
@@ -76,6 +78,7 @@ void loop() {
     jsonResponse = NULL;
   }
   consumeHttpRequest();
+  subscribe(email_buff);
 }
 
 // handles message arrived on subscribed topic(s)
@@ -92,6 +95,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
   printFreeMemory("memory before print buffer");
   jsonResponse = String(message_buff);
   currentCommand = getCommand(String(topic));
+  Serial.print("current command:");
+  Serial.println(currentCommand);
   printFreeMemory("memory after buffer");
 }
 
@@ -101,7 +106,6 @@ void changeZoneStatus(Zone zone) {
   } else {
     digitalWrite(zone.id +1, LOW);
   }
-  char pubMsg[50]; 
   //{"id":7,"status":"ON"}
   String pubMsgStr = ("{\"id\":");
   pubMsgStr.concat(zone.id);
@@ -111,12 +115,35 @@ void changeZoneStatus(Zone zone) {
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
   Serial.print("publish message:");
   Serial.println(pubMsg);
-  pubSubClient.publish("h2lo/cloud/3", pubMsg);
+  String publishTopicStr = "h2lo/";
+  publishTopicStr.concat("cloud/3/UPDATE_ZONE_STATUS");
+  publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
+  Serial.print("publish topic:");
+  Serial.println(publishTopic);
+  pubSubClient.publish(publishTopic, pubMsg);
+}
+
+void subscribe(char* email) {
+  if(strlen(email) > 0) {
+    Serial.print("publish message:");
+    Serial.println(email);  
+    String publishTopicStr = "h2lo/";
+    long randNumber = random(500000);
+    publishTopicStr.concat("cloud/");
+    publishTopicStr.concat(randNumber);
+    publishTopicStr.concat("/SUBSCRIBE");
+    publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
+    Serial.print("publish topic:");
+    Serial.println(publishTopic);
+    pubSubClient.publish(publishTopic, email);
+    // Now we clear our array
+    memset( email, 0, sizeof(email) );    
+  }
 }
 
 void consumeHttpRequest() {
   // Easy test:
-  // curl -X POST -d "name=foobar,email=xxx@xxx.com,ssid=12345" http://192.168.1.177
+  // curl -X POST -d "email=xxx@xxx.com" http://192.168.1.177
   // listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
@@ -132,10 +159,15 @@ void consumeHttpRequest() {
         // so you can send a reply
         if (c == '\n' && currentLineIsBlank) {
           // this is to retrieve POST data
+          int i = 0;  
+          // create character buffer with ending null terminator (string)          
           while(client.available()) {
             char t = client.read();
             Serial.print(t);
-          }              
+            email_buff[i] = t;
+            i++;
+          }
+          email_buff[i] = '\0';  
           Serial.println();
           // send a standard http response header
           client.println("HTTP/1.1 200 OK");
@@ -145,7 +177,6 @@ void consumeHttpRequest() {
           client.println("<!DOCTYPE HTML>");
           client.println("<html>");
           client.println("<form method=\"POST\">");
-          client.println("Username: <input type=\"text\" name=\"username\"><br>");
           client.println("Email: <input type=\"text\" name=\"email\"><br>");
           client.println("<input type=\"submit\" value=\"Submit\">");
           client.println("</form>");
