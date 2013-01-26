@@ -1,5 +1,25 @@
 #include <SPI.h>
 
+// used for EEPROM management
+#define CONFIG_VERSION "ar1"
+#define CONFIG_START 0
+
+struct StorageStruct {
+  char version[4];
+  char ssid[24];
+  char pwd[16];
+  byte addr[4];
+  unsigned int id;
+  long devicePIN;
+} WiFiConfig = {
+  CONFIG_VERSION,
+  "NetworkConnectTo",
+  "",
+  {0, 0, 0, 0},
+  0,
+  0
+};
+
 // structure to hold JSON Device
 typedef struct Device
 {
@@ -33,7 +53,6 @@ int zoneCount = 8;
 #define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
 #define MQTT_KEEPALIVE 5
-
 
 
 
