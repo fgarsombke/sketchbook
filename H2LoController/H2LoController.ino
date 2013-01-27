@@ -49,8 +49,7 @@ void setup() {
   loadConfig();
   Serial.print("devicePIN:");
   Serial.println(WiFiConfig.devicePIN);
-  
-  /*
+    /*
   // Generate a new UUID
   TrueRandom.uuid(uuidNumber);
   Serial.print("The UUID number is:");
@@ -62,6 +61,7 @@ void setup() {
     subscribeToTopic();
   } else {
     // Start the weberver
+    Serial.println("start web server");
     server.begin();    
   }  
 }
@@ -89,7 +89,7 @@ void loop() {
     jsonResponse = NULL;
   }
   // determine if we use our webserver for device intial configuration or not
-  if(WiFiConfig.devicePIN = 0) {
+  if(WiFiConfig.devicePIN == 0) {
     // device has not been configured yet
     consumeHttpRequest();
     subscribe(email_buff);    
@@ -118,15 +118,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void changeZoneStatus(Zone zone) {
   if (zone.zoneStatus.equals("ON")) {
-    digitalWrite(zone.id +1, HIGH);
+    digitalWrite(zone.zoneNumber +1, HIGH);
   } else {
-    digitalWrite(zone.id +1, LOW);
+    digitalWrite(zone.zoneNumber +1, LOW);
   }
-  //{"id":7,"status":"ON"}
+  //{"zoneNumber":7,"status":"ON"}
   char pubMsg[50];
   char publishTopic[50];
-  String pubMsgStr = ("{\"id\":");
-  pubMsgStr.concat(zone.id);
+  String pubMsgStr = ("{\"zoneNumber\":");
+  pubMsgStr.concat(zone.zoneNumber);
   pubMsgStr.concat(",\"status\":\"");
   pubMsgStr.concat(zone.zoneStatus);
   pubMsgStr.concat("\"}");

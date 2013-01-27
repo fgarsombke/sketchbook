@@ -31,7 +31,7 @@ typedef struct Device
 typedef struct Zone
 {
   String zoneStatus;
-  int id;
+  int zoneNumber;
 } Zone;
 
 // Zone
