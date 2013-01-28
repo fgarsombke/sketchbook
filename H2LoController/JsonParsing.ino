@@ -2,20 +2,19 @@ void parseZone(void *workingZone, char* payloadArray) {
   // 7,ON
   Zone* myZone = (Zone*)workingZone;
   char delims[] = ",";
-  Serial.print(F("b4 parse:"));
-  Serial.println(freeRam());
+  //Serial.print(F("b4 parse:"));
+  //Serial.println(freeRam());
   char *tokens;
   tokens = strtok(payloadArray, delims);
   Serial.print(F("zoneNumber:"));  
   Serial.println(tokens);
+  myZone->zoneNumber = atoi(tokens);
   tokens = strtok(NULL, delims);
   Serial.print(F("zoneStatus:"));  
   Serial.println(tokens);  
-  //myZone->zoneNumber = atoi(result);
-  //myZone->zoneStatus = result;
-  //Serial.println(result);  
-  Serial.print(F("after parse:"));
-  Serial.println(freeRam());
+  myZone->zoneStatus = tokens;
+  //Serial.print(F("after parse:"));
+  //Serial.println(freeRam());
 }
 
 int getCurrentCommand(String topic) {

@@ -3,9 +3,6 @@
 // used for EEPROM management
 #define CONFIG_VERSION "ar1"
 #define CONFIG_START 0
-
-// Server Commands
-const String CMD_UPDATE_ZONE_STATUS = "UPDATE_ZONE_STATUS";
 // Command codes
 const int CODE_CMD_UPDATE_ZONE_STATUS = 1;
 #define STATUS "status"
