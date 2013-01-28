@@ -1,14 +1,13 @@
-#include <MemoryFree.h>
 #include <EEPROM.h>
 /**
  * Print the Free memory along with a message in the Serial window
  *
  * Uses MemoryFree library - https://github.com/sudar/MemoryFree
  */
-void printFreeMemory(char* message) {
- Serial.print(message);
- Serial.print(":\t");
- Serial.println(getFreeMemory());
+int freeRam () {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
 }
 
 // Used for EEPROM management

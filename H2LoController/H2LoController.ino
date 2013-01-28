@@ -1,3 +1,4 @@
+
 /*
   H2LoController
  created 04 Jan 2012
@@ -6,49 +7,45 @@
 #include "Structures.h"
 #include <SPI.h>
 #include <Ethernet.h>
-#include <MemoryFree.h>
 #include <PubSubClient.h>
+#include <MemoryFree.h>
 //#include <TrueRandom.h>
 
-// Server Commands
-const String CMD_UPDATE_ZONE_STATUS = "UPDATE_ZONE_STATUS";
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 EthernetClient ethernetClient;
 EthernetServer server(80);  
-String jsonResponse = "";
-char email_buff[50];
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
 int zoneId;
-String currentCommand;
-static const struct Zone EmptyStruct;
+Zone* workingZone = new Zone();
 //byte uuidNumber[16]; // UUIDs in binary form are 16 bytes long
+
 
 void setup() {
   // start serial port:
   Serial.begin(9600);
   // give the ethernet module time to boot up:
   delay(1000);
-  printFreeMemory("initial memory");
+  Serial.print(F("Free:"));
+  Serial.println(getFreeMemory());  
   IPAddress ip(192,168,1, 177);
   Ethernet.begin(mac, ip);
   // give the Ethernet shield a second to initialize:
   delay(2000);
-  // print the Ethernet board/shield's IP address:
-  Serial.print("My IP address:");
-  Serial.println(Ethernet.localIP());
-  printFreeMemory("After Setup memory"); 
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
   }
-  Serial.println("connecting pub sub client");
+  Serial.println(F("mqtt connect"));
   pubSubClient.connect(M2MIO_DEVICE_ID);
 
   // load EEPROM information
   loadConfig();
-  Serial.print("devicePIN:");
-  Serial.println(WiFiConfig.devicePIN);
+  
+  /* uncomment out to reset device PIN
+  WiFiConfig.devicePIN = 0;
+  saveConfig();
+  */
     /*
   // Generate a new UUID
   TrueRandom.uuid(uuidNumber);
@@ -61,14 +58,16 @@ void setup() {
     subscribeToTopic();
   } else {
     // Start the weberver
-    Serial.println("start web server");
+    //Serial.println("start web server");
     server.begin();    
-  }  
+  } 
+  Serial.print(F("after:"));
+  Serial.println(freeRam());
 }
 
 void loop() {
   if (!pubSubClient.connected()) {
-    Serial.println("re-connecting pub sub client");
+    Serial.println(F("mqtt connect"));
     pubSubClient.connect(M2MIO_DEVICE_ID);
     if(WiFiConfig.devicePIN > 0) {
       subscribeToTopic(); 
@@ -76,62 +75,53 @@ void loop() {
   }
   // MQTT client loop processing
   pubSubClient.loop();
-  delay(2000);
-  //Serial.print("jsonResponse:");
-  //Serial.println(jsonResponse);
-  if(jsonResponse != NULL) {
-    Serial.println("Do Something!");
-    if (currentCommand.compareTo(CMD_UPDATE_ZONE_STATUS) == 0) {
-      Zone zone = parseZone(jsonResponse);
-      changeZoneStatus(zone);
-      zone = EmptyStruct;
-    }
-    jsonResponse = NULL;
-  }
+  delay(1000);
   // determine if we use our webserver for device intial configuration or not
   if(WiFiConfig.devicePIN == 0) {
     // device has not been configured yet
     consumeHttpRequest();
-    subscribe(email_buff);    
   }
 }
 
 // handles message arrived on subscribed topic(s)
 void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived:topic:");
-  Serial.println(String(topic));
-  Serial.println("Length:" + String(length,DEC));
-  char message_buff[50];  
+  Serial.print(F("topic:"));
+  char message_buff[length+1];
+  //Serial.println(String(topic));
   int i = 0;  
   // create character buffer with ending null terminator (string)
   for(i=0; i<length; i++) {
     message_buff[i] = payload[i];
   }
   message_buff[i] = '\0';
-  printFreeMemory("memory before print buffer");
-  jsonResponse = String(message_buff);
-  currentCommand = getCommand(String(topic));
-  Serial.print("current command:");
-  Serial.println(currentCommand);
-  printFreeMemory("memory after buffer");
+  Serial.println(getFreeMemory());  
+  Serial.print(F("payload:"));
+  //String jsonResponse = String(message_buff);
+  //Serial.println(jsonResponse);
+  if (getCurrentCommand(String(topic)) == CODE_CMD_UPDATE_ZONE_STATUS) {
+    parseZone(workingZone, message_buff);
+    changeZoneStatus(workingZone);
+  }
 }
 
-void changeZoneStatus(Zone zone) {
-  if (zone.zoneStatus.equals("ON")) {
-    digitalWrite(zone.zoneNumber +1, HIGH);
+void changeZoneStatus(void* workingZone) {
+  Zone* myZone = (Zone*)workingZone;  
+  char pubMsg[50];  
+  char publishTopic[50];
+  Serial.println(F("changing zone status"));
+  if (myZone->zoneStatus.equals("ON")) {
+    digitalWrite(myZone->zoneNumber +1, HIGH);
   } else {
-    digitalWrite(zone.zoneNumber +1, LOW);
+    digitalWrite(myZone->zoneNumber +1, LOW);
   }
   //{"zoneNumber":7,"status":"ON"}
-  char pubMsg[50];
-  char publishTopic[50];
   String pubMsgStr = ("{\"zoneNumber\":");
-  pubMsgStr.concat(zone.zoneNumber);
+  pubMsgStr.concat(myZone->zoneNumber);
   pubMsgStr.concat(",\"status\":\"");
-  pubMsgStr.concat(zone.zoneStatus);
+  pubMsgStr.concat(myZone->zoneStatus);
   pubMsgStr.concat("\"}");
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
-  Serial.print("publish message:");
+  Serial.print(F("publish message:"));
   Serial.println(pubMsg);
   String publishTopicStr = "h2lo/";
   publishTopicStr.concat("cloud/");
@@ -139,25 +129,25 @@ void changeZoneStatus(Zone zone) {
   publishTopicStr.concat(WiFiConfig.devicePIN);
   publishTopicStr.concat("/UPDATE_ZONE_STATUS");
   publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
-  Serial.print("publish topic:");
+  Serial.print(F("publish topic:"));
   Serial.println(publishTopic);
   pubSubClient.publish(publishTopic, pubMsg);
 }
 
 void subscribe(char* email) {
   if(strlen(email) > 0) {
-    Serial.print("publish message:");
-    Serial.println(email); 
-    char publishTopic[30]; 
+    char subscriptionPublishTopic[50];
+    Serial.print(F("publish message:"));
+    //Serial.println(email); 
     String publishTopicStr = "h2lo/";
     long randNumber = random(500000);
     publishTopicStr.concat("cloud/");
     publishTopicStr.concat(randNumber);
     publishTopicStr.concat("/SUBSCRIBE");
-    publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
-    Serial.print("publish topic:");
-    Serial.println(publishTopic);
-    pubSubClient.publish(publishTopic, email);
+    publishTopicStr.toCharArray(subscriptionPublishTopic, publishTopicStr.length()+1); 
+    Serial.print(F("publish topic:"));
+    //Serial.println(publishTopic);
+    pubSubClient.publish(subscriptionPublishTopic, email);
 
     // persist the device id    
     WiFiConfig.devicePIN = randNumber;
@@ -172,24 +162,25 @@ void subscribe(char* email) {
 
 void subscribeToTopic() {
   loadConfig();
-  char subscribeTopic[30];
+  char subscribeTopic[30];  
   String subscribeTopicStr = "h2lo/";
   subscribeTopicStr.concat("device/");
   subscribeTopicStr.concat(WiFiConfig.devicePIN);
   subscribeTopicStr.concat("/+");
   subscribeTopicStr.toCharArray(subscribeTopic, subscribeTopicStr.length()+1);
-  Serial.print("subscribeTopic:");
+  Serial.print(F("subscribe:"));
   Serial.println(subscribeTopic);
   pubSubClient.subscribe(subscribeTopic);  
 }
 
 void consumeHttpRequest() {
+  char email_buff[50];
   // Easy test:
   // curl -X POST -d "email=xxx@xxx.com" http://192.168.1.177
   // listen for incoming clients
   EthernetClient client = server.available();
   if (client) {
-    Serial.println("new client");
+    Serial.println(F("new client"));
     // an http request ends with a blank line
     boolean currentLineIsBlank = true;
     while (client.connected()) {
@@ -237,9 +228,15 @@ void consumeHttpRequest() {
       }
     }
     // give the web browser time to receive the data
-    delay(1);
+    delay(100);
     // close the connection:
     client.stop();
-    Serial.println("client disonnected");
+    if(email_buff > 0) {
+      // subscribe the device
+      subscribe(email_buff);
+      // Now we clear our array
+      memset(email_buff, 0, sizeof(email_buff) );      
+    }  
+    Serial.println(F("client disonnected"));
   }
 }

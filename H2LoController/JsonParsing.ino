@@ -1,18 +1,26 @@
-struct Zone parseZone(String zoneJson) {
-  // {"status":"ON", "zoneNumber":7}
-  struct Zone myZone;
-  String zoneStatus = zoneJson.substring(zoneJson.indexOf("status") +9, zoneJson.indexOf(',')-1);
-  Serial.println("zoneStatus:" + zoneStatus);
-  myZone.zoneStatus = zoneStatus;
-  String zoneNumber = zoneJson.substring(zoneJson.indexOf("zoneNumber") +12,zoneJson.indexOf('}'));
-  Serial.println("zoneNumber:" + zoneNumber);
-  myZone.zoneNumber = zoneNumber.toInt();
-  return myZone;
+void parseZone(void *workingZone, char* payloadArray) { 
+  // 7,ON
+  Zone* myZone = (Zone*)workingZone;
+  char delims[] = ",";
+  Serial.print(F("b4 parse:"));
+  Serial.println(freeRam());
+  char *tokens;
+  tokens = strtok(payloadArray, delims);
+  Serial.print(F("zoneNumber:"));  
+  Serial.println(tokens);
+  tokens = strtok(NULL, delims);
+  Serial.print(F("zoneStatus:"));  
+  Serial.println(tokens);  
+  //myZone->zoneNumber = atoi(result);
+  //myZone->zoneStatus = result;
+  //Serial.println(result);  
+  Serial.print(F("after parse:"));
+  Serial.println(freeRam());
 }
 
-String getCommand(String topic) {
-  Serial.println("getCommand.");
-  String command = topic.substring(topic.lastIndexOf('/') +1,topic.length());
-  Serial.println("command:" + command);
+int getCurrentCommand(String topic) {
+  int command = topic.substring(topic.lastIndexOf('/') +1,topic.length()).toInt();
+  Serial.print(F("command:"));
+  //Serial.println(command);
   return command;
 }

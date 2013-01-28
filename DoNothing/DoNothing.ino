@@ -9,13 +9,18 @@ int zone8 = 9; //pin 9
 
 int zoneCount = 8;
 int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
+#include <MemoryFree.h>
 
 void setup()
 {
+  // start serial port:
+  Serial.begin(9600);
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
   }
+  Serial.print(F("Free:"));
+  Serial.println(getFreeMemory());  
 }
 
 void loop() {

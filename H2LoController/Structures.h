@@ -4,6 +4,15 @@
 #define CONFIG_VERSION "ar1"
 #define CONFIG_START 0
 
+// Server Commands
+const String CMD_UPDATE_ZONE_STATUS = "UPDATE_ZONE_STATUS";
+// Command codes
+const int CODE_CMD_UPDATE_ZONE_STATUS = 1;
+#define STATUS "status"
+#define ZONE_NUMBER "zoneNumber"
+#define COMMA ','
+#define RIGHT_BRACKET '}'
+
 struct StorageStruct {
   char version[4];
   char ssid[24];
@@ -20,19 +29,12 @@ struct StorageStruct {
   0
 };
 
-// structure to hold JSON Device
-typedef struct Device
-{
-  String pin;
-  int id;
-} Device;
-
 // structure to hold JSON Zone
-typedef struct Zone
+struct Zone
 {
   String zoneStatus;
   int zoneNumber;
-} Zone;
+};
 
 // Zone
 int zone1 = 2; //pin 2
