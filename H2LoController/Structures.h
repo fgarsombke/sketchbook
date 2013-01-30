@@ -53,5 +53,3 @@ int zoneCount = 8;
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
 #define MQTT_KEEPALIVE 5
 
-
-

@@ -1,4 +1,3 @@
-
 /*
   H2LoController
  created 04 Jan 2012
@@ -9,15 +8,20 @@
 #include <Ethernet.h>
 #include <PubSubClient.h>
 #include <MemoryFree.h>
+#include <Event.h>
+#include <Timer.h>
 //#include <TrueRandom.h>
 
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+Timer timer;
 EthernetClient ethernetClient;
 EthernetServer server(80);  
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
 int zoneId;
+//const long heartbeatPeriod = 60000;
 Zone* workingZone = new Zone();
+long devicePIN = 0;
 //byte uuidNumber[16]; // UUIDs in binary form are 16 bytes long
 
 
@@ -36,7 +40,7 @@ void setup() {
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
   }
-  Serial.println(F("mqtt connect"));
+  Serial.println(F("mqtt initial connect"));
   pubSubClient.connect(M2MIO_DEVICE_ID);
 
   // load EEPROM information
@@ -55,7 +59,13 @@ void setup() {
   */
   // determine if we use our webserver for device intial configuration or not
   if(WiFiConfig.devicePIN > 0) {
+    // set the global devicePIN
+    devicePIN = WiFiConfig.devicePIN;
     subscribeToTopic();
+    // tell everyone we are alive!
+    publishHeartbeat();
+    // Run the 'callback' every 'period' milliseconds.
+    int publishHeartbeatEvent = timer.every(60000, publishHeartbeat);
   } else {
     // Start the weberver
     //Serial.println("start web server");
@@ -67,9 +77,9 @@ void setup() {
 
 void loop() {
   if (!pubSubClient.connected()) {
-    Serial.println(F("mqtt connect"));
+    Serial.println(F("mqtt re-connecting"));
     pubSubClient.connect(M2MIO_DEVICE_ID);
-    if(WiFiConfig.devicePIN > 0) {
+    if(devicePIN > 0) {
       subscribeToTopic(); 
     }    
   }
@@ -77,10 +87,12 @@ void loop() {
   pubSubClient.loop();
   delay(1000);
   // determine if we use our webserver for device intial configuration or not
-  if(WiFiConfig.devicePIN == 0) {
+  if(devicePIN == 0) {
     // device has not been configured yet
     consumeHttpRequest();
   }
+  // Must be called from 'loop'. This will service all the events associated with the timer. - http://playground.arduino.cc/Code/Timer
+  timer.update();
 }
 
 // handles message arrived on subscribed topic(s)
@@ -122,16 +134,28 @@ void changeZoneStatus(void* workingZone) {
   pubMsgStr.concat("\"}");
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
   Serial.print(F("publish message:"));
-  Serial.println(pubMsg);
+  //Serial.println(pubMsg);
   String publishTopicStr = "h2lo/";
   publishTopicStr.concat("cloud/");
-  loadConfig();
-  publishTopicStr.concat(WiFiConfig.devicePIN);
+  publishTopicStr.concat(devicePIN);
   publishTopicStr.concat("/UPDATE_ZONE_STATUS");
   publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
   Serial.print(F("publish topic:"));
-  Serial.println(publishTopic);
+  //Serial.println(publishTopic);
   pubSubClient.publish(publishTopic, pubMsg);
+}
+
+void publishHeartbeat() {
+  char publishTopic[50];
+  char pubMsg[] = "ACTIVE";
+  String publishTopicStr = "h2lo/";
+  publishTopicStr.concat("cloud/");
+  publishTopicStr.concat(devicePIN);
+  publishTopicStr.concat("/HEARTBEAT");
+  publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
+  Serial.print(F("publish topic:"));
+  Serial.println(publishTopic);
+  pubSubClient.publish(publishTopic, pubMsg);  
 }
 
 void subscribe(char* email) {
@@ -152,6 +176,8 @@ void subscribe(char* email) {
     // persist the device id    
     WiFiConfig.devicePIN = randNumber;
     saveConfig();
+    // set the global PIN
+    devicePIN = WiFiConfig.devicePIN;
 
     subscribeToTopic();
     
@@ -161,11 +187,10 @@ void subscribe(char* email) {
 }
 
 void subscribeToTopic() {
-  loadConfig();
   char subscribeTopic[30];  
   String subscribeTopicStr = "h2lo/";
   subscribeTopicStr.concat("device/");
-  subscribeTopicStr.concat(WiFiConfig.devicePIN);
+  subscribeTopicStr.concat(devicePIN);
   subscribeTopicStr.concat("/+");
   subscribeTopicStr.toCharArray(subscribeTopic, subscribeTopicStr.length()+1);
   Serial.print(F("subscribe:"));
