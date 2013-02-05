@@ -23,3 +23,9 @@ void saveConfig() {
   for (unsigned int t=0; t<sizeof(WiFiConfig); t++)
     EEPROM.write(CONFIG_START + t, *((char*)&WiFiConfig + t));
 }
+
+void clearCommandRunning(){
+  for (int i = 0; i < commandRunningLength; i++){
+    commandRunning[i] = 0;
+  }
+}

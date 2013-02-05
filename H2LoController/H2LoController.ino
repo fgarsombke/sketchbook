@@ -11,6 +11,7 @@
 #include <Event.h>
 #include <Timer.h>
 #include <aJSON.h>
+#include <QueueArray.h> // http://playground.arduino.cc/Code/QueueArray
 
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -20,10 +21,24 @@ EthernetServer server(80);
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
 int zoneId;
 int currentCommand = CODE_CMD_NO_ACTION;
-Zone* workingZone = new Zone();
 long devicePIN = 0;
-// store all of the schedules in this array
-Schedule schedule[8];
+// LED indicator pin variables
+int ledIndicator = 13;
+int ledState = LOW;
+unsigned long ledFlashTimer = 0;       // timer for LED in milliseconds
+unsigned long ledFlashInterval = 1000; // flash interval in milliseconds
+int commandRunningLength = 4;
+unsigned long commandRunning[] = {0, // pin ID, 0 for none
+                                  0, // run end time in milliseconds, 0 for none
+                                  0, // zone ID, 0 for none
+                                  0  // run start time in milliseconds, 0 for none
+                                  };
+const int CR_PIN_ID     = 0;
+const int CR_END_TIME   = 1;
+const int CR_ZONE_ID    = 2;
+const int CR_START_TIME = 3;
+// create a stack of run schedules.
+QueueArray <Schedule> scheduleStack;
 char message_buff[200];
 
 void setup() {
@@ -79,7 +94,7 @@ void loop() {
   }
   // MQTT client loop processing
   pubSubClient.loop();
-  delay(1000);
+  delay(2000);
   // determine if we use our webserver for device intial configuration or not
   if(devicePIN == 0) {
     // device has not been configured yet
@@ -89,40 +104,66 @@ void loop() {
   if(devicePIN > 0) {
     timer.update();    
   }
-  
   // This action is received from callback. If there is a command value, execute on it
   if(currentCommand != CODE_CMD_NO_ACTION) {
     runCurrentCommand();
-  }    
+  }
+  // are there any schedules on the stack that we need to run?
+  runSchedules();
+  // check on timed runs, shutdown expired runs
+  checkTimedRun();
+}
+
+void runSchedules() {
+  // run the next schedule off of the stack if there are more schedules and nothing is currently running
+  if(!scheduleStack.isEmpty() && commandRunning[CR_END_TIME] == NO_SCHEDULE_RUNNING) {
+    Schedule poppedSchedule = scheduleStack.pop();
+    /*
+    Serial.print(F("stack size after pop:"));
+    Serial.println(scheduleStack.count());
+    */
+    // Turn the zone ON
+    startTimedRun(poppedSchedule.zoneNumber, poppedSchedule.duration);
+    
+  }
 }
 
 // handles message arrived on subscribed topic(s)
 void callback(char* topic, byte* payload, unsigned int length) {
+  /*
   Serial.print(F("length:"));
   Serial.println(length);
   Serial.print(F("topic:"));
   Serial.println(topic);
+  */
   int i = 0;  
   // create character buffer with ending null terminator (string)
   for(i=0; i<length; i++) {
     message_buff[i] = payload[i];
   }
   message_buff[i] = '\0';
-  Serial.println(getFreeMemory());  
+  Serial.println(getFreeMemory());
+  /*
   Serial.print(F("payload:"));
   String jsonResponse = String(message_buff);
   Serial.println(jsonResponse);
+  */
   currentCommand = getCurrentCommand(String(topic));
 }
 
 void runCurrentCommand() {
+  struct Schedule schedule = parseZoneJson(message_buff);
   switch (currentCommand) {
     case CODE_CMD_UPDATE_ZONE_STATUS: // Turn zone ON/OFF
-      parseZone(workingZone, message_buff);
-      changeZoneStatus(workingZone);
+      changeZoneStatus(schedule);
     break;
     case CODE_CMD_RUN_ZONE_SCHEDULE: // Run a whole zone schedule
-      parseZoneScheduleJson(message_buff);
+      // put the schedule on the stack for processing
+      scheduleStack.push(schedule);
+      /*
+      Serial.print(F("stack size after push:"));
+      Serial.println(scheduleStack.count());    
+      */
     break;
     default:
       Serial.print(F("Unsupported command."));
@@ -134,33 +175,114 @@ void runCurrentCommand() {
   memset(message_buff, 0, sizeof message_buff);
 }
 
-void changeZoneStatus(void* workingZone) {
-  Zone* myZone = (Zone*)workingZone;  
+void changeZoneStatus(struct Schedule schedule) {
+  /*
+   *
+    Should we clear out the schedule stack if we get these manual controls?
+   * 
+   */
+  //Serial.println(F("changing zone status"));
+  if (schedule.zoneStatus == ZONE_STATUS_ON) {
+    // start a timed run with zone and duration information
+    startTimedRun(schedule.zoneNumber, schedule.duration);
+  } else {
+    endTimedRun();
+  }
+}
+
+void publishZoneChangeMessage(int zoneNumber, int zoneStatus) {
   char pubMsg[50];
   char publishTopic[50];
-  Serial.println(F("changing zone status"));
-  if (myZone->zoneStatus.equals("ON")) {
-    digitalWrite(myZone->zoneNumber +1, HIGH);
-  } else {
-    digitalWrite(myZone->zoneNumber +1, LOW);
-  }
-  //{"zoneNumber":7,"status":"ON"}
-  String pubMsgStr = ("{\"zoneNumber\":");
-  pubMsgStr.concat(myZone->zoneNumber);
-  pubMsgStr.concat(",\"status\":\"");
-  pubMsgStr.concat(myZone->zoneStatus);
-  pubMsgStr.concat("\"}");
+  //{"z":7,"s": 1}
+  String pubMsgStr = ("{\"z\":");
+  pubMsgStr.concat(zoneNumber);
+  pubMsgStr.concat(",\"s\":");
+  pubMsgStr.concat(zoneStatus);
+  pubMsgStr.concat("}");
   pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
-  Serial.print(F("publish message:"));
+  //Serial.print(F("publish message:"));
   //Serial.println(pubMsg);
   String publishTopicStr = "h2lo/";
   publishTopicStr.concat("cloud/");
   publishTopicStr.concat(devicePIN);
   publishTopicStr.concat("/UPDATE_ZONE_STATUS");
   publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
-  Serial.print(F("publish topic:"));
+  //Serial.print(F("publish topic:"));
   //Serial.println(publishTopic);
   pubSubClient.publish(publishTopic, pubMsg);
+}
+
+void startTimedRun(int zone, unsigned long seconds){
+  // deactivate last zone before starting another
+  endTimedRun();
+  // select pin (shift object id to base zero):
+  int pin = zones[zone - 1];
+  /*
+  Serial.print(F("requesting run for zone#:"));
+  Serial.println(zone);
+  Serial.print(F("starting run on pin:"));
+  Serial.println(pin);
+  */
+  // turn on selected zone
+  digitalWrite(pin, HIGH);
+  // turn on the LED indicator light
+  digitalWrite(ledIndicator, HIGH);  // set the LED on
+  ledFlashTimer = millis() + 10000;   // set the timer
+  ledState = HIGH;                   // set the state
+  // set commandRunning parameters
+  commandRunning[CR_ZONE_ID] = zone;
+  commandRunning[CR_PIN_ID] = pin; //BUG?: int to unsigned long?
+  commandRunning[CR_START_TIME] = millis();
+  commandRunning[CR_END_TIME] = commandRunning[CR_START_TIME] + (seconds * 1000);
+  // send a message to the cloud that a zone status has changed
+  publishZoneChangeMessage(zone, ZONE_STATUS_ON);  
+}
+/*
+  Check on timedRuns, stop runs on expiration time
+*/
+void checkTimedRun(){
+  // check for running command
+  if (commandRunning[CR_END_TIME] > 0){
+    // a command is running, check for time end
+    if (millis() >= commandRunning[CR_END_TIME]){
+      // close valve: stop zone X
+      endTimedRun();
+    } else {
+    // Flash the LED
+    if (millis() >= ledFlashTimer){
+      if (ledState == LOW){
+        ledState = HIGH;
+      } else {
+        ledState = LOW;
+      }
+      // Change the LED state
+      digitalWrite(ledIndicator, ledState);
+      // reset the timer for the next state change
+      ledFlashTimer = millis() + ledFlashInterval;
+    }
+   }
+  }
+}
+
+void endTimedRun(){
+  // if ZONE == 0 nothing is running
+  if(commandRunning[CR_ZONE_ID] == CODE_CMD_NO_ACTION) {
+    return;
+  }
+  /*
+  Serial.print(F("deactivating zone:"));
+  Serial.println(commandRunning[CR_ZONE_ID]);
+  */
+  // turn off the pin for the active zone
+  digitalWrite(commandRunning[CR_PIN_ID], LOW);
+  // turn off the LED indicator
+  digitalWrite(ledIndicator, LOW);    // set the LED off
+  ledState = LOW;                     // reset the state
+  ledFlashTimer = 0;                  // reset the timer
+  // send a message to the cloud that a zone status has changed
+  publishZoneChangeMessage(commandRunning[CR_ZONE_ID], ZONE_STATUS_OFF);  
+  // clear the commandRunning array
+  clearCommandRunning();
 }
 
 void publishHeartbeat() {
@@ -180,7 +302,7 @@ void subscribe(char* email) {
   if(strlen(email) > 0) {
     char subscriptionPublishTopic[50];
     Serial.print(F("publish message:"));
-    //Serial.println(email); 
+    Serial.println(email); 
     String publishTopicStr = "h2lo/";
     long randNumber = random(500000);
     publishTopicStr.concat("cloud/");
@@ -188,7 +310,7 @@ void subscribe(char* email) {
     publishTopicStr.concat("/SUBSCRIBE");
     publishTopicStr.toCharArray(subscriptionPublishTopic, publishTopicStr.length()+1); 
     Serial.print(F("publish topic:"));
-    //Serial.println(publishTopic);
+    Serial.println(subscriptionPublishTopic);
     pubSubClient.publish(subscriptionPublishTopic, email);
 
     // persist the device id    
