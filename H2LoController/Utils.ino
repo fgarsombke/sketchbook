@@ -23,23 +23,3 @@ void saveConfig() {
   for (unsigned int t=0; t<sizeof(WiFiConfig); t++)
     EEPROM.write(CONFIG_START + t, *((char*)&WiFiConfig + t));
 }
-
-void printHex(byte number) {
-  int topDigit = number >> 4;
-  int bottomDigit = number & 0x0f;
-  // Print high hex digit
-  Serial.print( "0123456789ABCDEF"[topDigit] );
-  // Low hex digit
-  Serial.print( "0123456789ABCDEF"[bottomDigit] );
-}
-
-void printUuid(byte* uuidNumber) {
-  int i;
-  for (i=0; i<16; i++) {
-    if (i==4) Serial.print("-");
-    if (i==6) Serial.print("-");
-    if (i==8) Serial.print("-");
-    if (i==10) Serial.print("-");
-    printHex(uuidNumber[i]);
-  }
-}

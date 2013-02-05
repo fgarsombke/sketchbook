@@ -4,11 +4,9 @@
 #define CONFIG_VERSION "ar1"
 #define CONFIG_START 0
 // Command codes
+const int CODE_CMD_NO_ACTION = 0;
 const int CODE_CMD_UPDATE_ZONE_STATUS = 1;
-#define STATUS "status"
-#define ZONE_NUMBER "zoneNumber"
-#define COMMA ','
-#define RIGHT_BRACKET '}'
+const int CODE_CMD_RUN_ZONE_SCHEDULE = 2;
 
 struct StorageStruct {
   char version[4];
@@ -33,6 +31,13 @@ struct Zone
   int zoneNumber;
 };
 
+// structure to hold JSON schedule
+struct Schedule
+{
+  int zoneNumber;
+  int duration;
+};
+
 // Zone
 int zone1 = 2; //pin 2
 int zone2 = 3; //pin 3
@@ -52,4 +57,5 @@ int zoneCount = 8;
 #define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
 #define MQTT_KEEPALIVE 5
+#define MQTT_MAX_PACKET_SIZE 128
 

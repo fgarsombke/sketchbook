@@ -20,6 +20,41 @@ void parseZone(void *workingZone, char* payloadArray) {
 int getCurrentCommand(String topic) {
   int command = topic.substring(topic.lastIndexOf('/') +1,topic.length()).toInt();
   Serial.print(F("command:"));
-  //Serial.println(command);
+  Serial.println(command);
   return command;
+}
+
+void parseZoneScheduleJson(char *jsonString) {
+  aJsonObject* root = aJson.parse(jsonString);
+
+  if (root != NULL) {
+    Serial.println(F("Parsed successfully Root"));
+    aJsonObject* zoneDurations = aJson.getObjectItem(root, "s"); 
+    if (zoneDurations != NULL) {
+      Serial.println(F("Parsed successfully zoneDurations"));
+      // determine array size
+      int zoneDurationsSize = aJson.getArraySize(zoneDurations);
+      Serial.print(F("zoneDurationsSize:"));
+      Serial.println(zoneDurationsSize);
+      // iterate over zones
+      for (int i = 0; i < zoneDurationsSize ; i++) {
+        aJsonObject* zoneDuration = aJson.getArrayItem(zoneDurations, i);               
+        if (zoneDuration != NULL) {
+          Serial.println(F("Parsed successfully zoneDuration"));
+          aJsonObject* zoneNumber = aJson.getObjectItem(zoneDuration, "z"); 
+          if (zoneNumber != NULL) {
+            schedule[i].zoneNumber = zoneNumber->valueint;
+            Serial.print(F("zoneNumber:"));
+            Serial.println(schedule[i].zoneNumber);
+          }
+          aJsonObject* duration = aJson.getObjectItem(zoneDuration, "d"); 
+          if (duration != NULL) {
+            schedule[i].duration = duration ->valueint;
+            Serial.print(F("duration:"));
+            Serial.println(schedule[i].duration);
+          }
+        }
+      }
+    }
+  }
 }

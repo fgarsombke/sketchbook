@@ -10,7 +10,7 @@
 #include <MemoryFree.h>
 #include <Event.h>
 #include <Timer.h>
-//#include <TrueRandom.h>
+#include <aJSON.h>
 
 // Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
 byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
@@ -19,11 +19,12 @@ EthernetClient ethernetClient;
 EthernetServer server(80);  
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, ethernetClient);
 int zoneId;
-//const long heartbeatPeriod = 60000;
+int currentCommand = CODE_CMD_NO_ACTION;
 Zone* workingZone = new Zone();
 long devicePIN = 0;
-//byte uuidNumber[16]; // UUIDs in binary form are 16 bytes long
-
+// store all of the schedules in this array
+Schedule schedule[8];
+char message_buff[200];
 
 void setup() {
   // start serial port:
@@ -50,13 +51,6 @@ void setup() {
   WiFiConfig.devicePIN = 0;
   saveConfig();
   */
-    /*
-  // Generate a new UUID
-  TrueRandom.uuid(uuidNumber);
-  Serial.print("The UUID number is:");
-  printUuid(uuidNumber);
-  Serial.println();  
-  */
   // determine if we use our webserver for device intial configuration or not
   if(WiFiConfig.devicePIN > 0) {
     // set the global devicePIN
@@ -64,13 +58,13 @@ void setup() {
     subscribeToTopic();
     // tell everyone we are alive!
     publishHeartbeat();
-    // Run the 'callback' every 'period' milliseconds.
-    int publishHeartbeatEvent = timer.every(60000, publishHeartbeat);
   } else {
     // Start the weberver
     //Serial.println("start web server");
     server.begin();    
   } 
+  // Run the 'callback' every 'period' milliseconds.
+  int publishHeartbeatEvent = timer.every(60000, publishHeartbeat);
   Serial.print(F("after:"));
   Serial.println(freeRam());
 }
@@ -92,14 +86,22 @@ void loop() {
     consumeHttpRequest();
   }
   // Must be called from 'loop'. This will service all the events associated with the timer. - http://playground.arduino.cc/Code/Timer
-  timer.update();
+  if(devicePIN > 0) {
+    timer.update();    
+  }
+  
+  // This action is received from callback. If there is a command value, execute on it
+  if(currentCommand != CODE_CMD_NO_ACTION) {
+    runCurrentCommand();
+  }    
 }
 
 // handles message arrived on subscribed topic(s)
 void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print(F("length:"));
+  Serial.println(length);
   Serial.print(F("topic:"));
-  char message_buff[length+1];
-  //Serial.println(String(topic));
+  Serial.println(topic);
   int i = 0;  
   // create character buffer with ending null terminator (string)
   for(i=0; i<length; i++) {
@@ -108,17 +110,33 @@ void callback(char* topic, byte* payload, unsigned int length) {
   message_buff[i] = '\0';
   Serial.println(getFreeMemory());  
   Serial.print(F("payload:"));
-  //String jsonResponse = String(message_buff);
-  //Serial.println(jsonResponse);
-  if (getCurrentCommand(String(topic)) == CODE_CMD_UPDATE_ZONE_STATUS) {
-    parseZone(workingZone, message_buff);
-    changeZoneStatus(workingZone);
+  String jsonResponse = String(message_buff);
+  Serial.println(jsonResponse);
+  currentCommand = getCurrentCommand(String(topic));
+}
+
+void runCurrentCommand() {
+  switch (currentCommand) {
+    case CODE_CMD_UPDATE_ZONE_STATUS: // Turn zone ON/OFF
+      parseZone(workingZone, message_buff);
+      changeZoneStatus(workingZone);
+    break;
+    case CODE_CMD_RUN_ZONE_SCHEDULE: // Run a whole zone schedule
+      parseZoneScheduleJson(message_buff);
+    break;
+    default:
+      Serial.print(F("Unsupported command."));
+    break;
   }
+  // reset current command since we have already executed this one
+  currentCommand = CODE_CMD_NO_ACTION;
+  // clear out the message buffer
+  memset(message_buff, 0, sizeof message_buff);
 }
 
 void changeZoneStatus(void* workingZone) {
   Zone* myZone = (Zone*)workingZone;  
-  char pubMsg[50];  
+  char pubMsg[50];
   char publishTopic[50];
   Serial.println(F("changing zone status"));
   if (myZone->zoneStatus.equals("ON")) {

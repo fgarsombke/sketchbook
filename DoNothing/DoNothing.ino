@@ -15,6 +15,7 @@ void setup()
 {
   // start serial port:
   Serial.begin(9600);
+  Serial.println(F("I am doing...nothing."));  
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
