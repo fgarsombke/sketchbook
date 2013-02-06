@@ -7,6 +7,16 @@ int getCurrentCommand(String topic) {
   return command;
 }
 
+char* retrieveZoneStatusJson(int zoneNumber, int zoneStatus) {
+  aJsonObject *root = aJson.createObject();
+  aJson.addNumberToObject(root,"z", zoneNumber);
+  aJson.addNumberToObject(root,"s", zoneStatus);
+  char* json_string = aJson.print(root);
+  // clean up the resources
+  aJson.deleteItem(root);
+  return json_string;
+}
+
 Schedule parseZoneJson(char *jsonString) {
   struct Schedule schedule;
   aJsonObject* root = aJson.parse(jsonString);

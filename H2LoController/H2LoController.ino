@@ -123,8 +123,7 @@ void runSchedules() {
     Serial.println(scheduleStack.count());
     */
     // Turn the zone ON
-    startTimedRun(poppedSchedule.zoneNumber, poppedSchedule.duration);
-    
+    startTimedRun(poppedSchedule.zoneNumber, poppedSchedule.duration);    
   }
 }
 
@@ -191,17 +190,12 @@ void changeZoneStatus(struct Schedule schedule) {
 }
 
 void publishZoneChangeMessage(int zoneNumber, int zoneStatus) {
-  char pubMsg[50];
   char publishTopic[50];
-  //{"z":7,"s": 1}
-  String pubMsgStr = ("{\"z\":");
-  pubMsgStr.concat(zoneNumber);
-  pubMsgStr.concat(",\"s\":");
-  pubMsgStr.concat(zoneStatus);
-  pubMsgStr.concat("}");
-  pubMsgStr.toCharArray(pubMsg, pubMsgStr.length()+1);
-  //Serial.print(F("publish message:"));
-  //Serial.println(pubMsg);
+  char* pubMsg = retrieveZoneStatusJson(zoneNumber, zoneStatus);
+  /*
+  Serial.print(F("publish message:"));
+  Serial.println(pubMsg);
+  */
   String publishTopicStr = "h2lo/";
   publishTopicStr.concat("cloud/");
   publishTopicStr.concat(devicePIN);
