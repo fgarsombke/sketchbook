@@ -57,7 +57,7 @@ void setup() {
     pinMode(zones[i], OUTPUT);
   }
   Serial.println(F("mqtt initial connect"));
-  pubSubClient.connect(M2MIO_DEVICE_ID);
+  pubSubClient.connect(M2MIO_DEVICE_ID, M2MIO_USERNAME, M2MIO_PASSWORD);
 
   // load EEPROM information
   loadConfig();

@@ -1,9 +1,9 @@
 #include <SPI.h>
 
 // MQTT
-#define MQTT_SERVER "m2m.eclipse.org"
-#define M2MIO_USERNAME   ""
-#define M2MIO_PASSWORD   ""
+#define MQTT_SERVER "ec2-50-17-66-9.compute-1.amazonaws.com"
+#define M2MIO_USERNAME   "device"
+#define M2MIO_PASSWORD   "D2afrEXeSWumech4daSP"
 #define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-device"
 
