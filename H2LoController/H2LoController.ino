@@ -328,12 +328,12 @@ void ensure_connected() {
   Serial.println(F("Ensuring connection."));
   connect_alarm = millis() + 30000;
   if (!pubSubClient.connected()) {   
-    Serial.println(F("failureCountMQTT:"));
-    Serial.print(failureCountMQTT);
+    Serial.print(F("failureCountMQTT:"));
+    Serial.println(failureCountMQTT);
     failureCountMQTT++;
     if (!wifi_connected) {
-      Serial.println(F("failureCountWiFi:"));
-      Serial.print(failureCountWiFi);
+      Serial.print(F("failureCountWiFi:"));
+      Serial.println(failureCountWiFi);
       failureCountWiFi++;
       initWiFi();
     }
