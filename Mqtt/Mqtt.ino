@@ -31,10 +31,11 @@ byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
 char ssid[] = "nintendo";          //  your network SSID (name) 
 char pass[] = "7ustESTenedr";   // your network password
 int status = WL_IDLE_STATUS;
+boolean wifi_connected = false;
 
 //char* jsonString = "hello world";
 //char* jsonString = "{\"deviceId\":2,\"zoneDurations\":[{\"zoneNumber\":3,\"duration\":5000},{\"zoneNumber\":4,\"duration\":10000}],\"hour\":0,\"minute\":0}";
-char* jsonString = "{\"d\":2,\"z\":1,\"s\":10}                    ";
+char* jsonString = "{\"d\":2,\"z\":1,\"s\":10}";
 //char* jsonString = "test";
 
 // Callback function header
@@ -69,50 +70,65 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void setup() {
   // start serial port:
   Serial.begin(9600);
-  
   //IPAddress ip(192,168,1, 177);
   //Ethernet.begin(mac, ip);
-  
-  initWiFi();
   // give the ethernet module time to boot up:
-  delay(1000);
-  if (client.connect(M2MIO_DEVICE_ID, M2MIO_USERNAME, M2MIO_PASSWORD)) {
-    Serial.print(F("Connected to MQTT"));
-    client.subscribe("arduinoOutTopic");
+  //delay(1000);
+}
+
+void loop() {
+  ensure_connected();
+  client.loop();
+  delay(2000);
+}
+
+void ensure_connected() {
+  static int failureCountMQTT = 0;
+  static int failureCountWiFi = 0;
+  static int ensureConnectionCount = 0;
+  ensureConnectionCount++;
+  Serial.print(F("Ensure connection count:"));
+  Serial.println(ensureConnectionCount);
+  if (!client.connected()) {   
+    Serial.print(F("failureCountMQTT:"));
+    Serial.println(failureCountMQTT);
+    failureCountMQTT++;
+    if (!wifi_connected) {
+      Serial.print(F("failureCountWiFi:"));
+      Serial.println(failureCountWiFi);
+      failureCountWiFi++;
+      initWiFi();
+    }
+    mqtt_connect();
   } else {
-    Serial.print(F("Not connected to MQTT"));
+    boolean publishSuccess = client.publish("arduinoOutTopic", jsonString);
   }
 }
 
-void loop()
-{
-  static int count = 0;
-  client.loop();
-  boolean publishSuccess = client.publish("arduinoOutTopic", jsonString);
-  Serial.print(F("Publish Success?"));
-  Serial.println(publishSuccess);
-  Serial.print(F("Still connected?"));
-  Serial.println(client.connected());
-  delay(1000);
-  count++;
-  Serial.print(F("count:")); 
-  Serial.println(count);  
+void mqtt_connect() {
+    Serial.println(F("Connecting to MQTT Broker..."));
+    if (client.connect(M2MIO_DEVICE_ID, M2MIO_USERNAME, M2MIO_PASSWORD)) {
+      Serial.println(F("Connected to MQTT"));
+      client.subscribe("arduinoOutTopic");
+    } else {
+      Serial.println(F("Failed connecting to MQTT"));
+    }
 }
 
 void initWiFi() {
-  
-  Serial.println("Attempting to connect to WPA network...");
-  Serial.print("SSID: ");
+  Serial.println(F("Attempting to connect to WPA network..."));
+  Serial.print(F("SSID:"));
   Serial.println(ssid);
-
   status = WiFi.begin(ssid, pass);
   if ( status != WL_CONNECTED) { 
-    Serial.println("Couldn't get a wifi connection");
-    while(true);
+    Serial.println(F("Couldn't get a wifi connection"));
+    wifi_connected = false;
   } 
   else {
-    Serial.print("Connected to wifi. My address:");
+    Serial.print(F("Connected to wifi. My address:"));
     IPAddress myAddress = WiFi.localIP();
     Serial.println(myAddress);
+    wifi_connected = true;
+    delay(1000);
   }
 }

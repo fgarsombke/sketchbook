@@ -11,20 +11,22 @@
  *
  * based on an orginal by H. Barragan for the Wiring i/o board
  */
-int zone1 = 2; //pin 2
-int zone2 = 3; //pin 3
-int zone3 = 4; //pin 4
-int zone4 = 5; //pin 5
-int zone5 = 6; //pin 6
-int zone6 = 7; //pin 7
-int zone7 = 8; //pin 8
-int zone8 = 9; //pin 9
-
+int pinStart = 22;
+// Zone
+int zone1 = pinStart++;
+int zone2 = pinStart++; 
+int zone3 = pinStart++; 
+int zone4 = pinStart++; 
+int zone5 = pinStart++; 
+int zone6 = pinStart++; 
+int zone7 = pinStart++; 
+int zone8 = pinStart;
 int zoneCount = 8;
 int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
 
 void setup()
 {
+  Serial.begin(9600);
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
@@ -35,8 +37,10 @@ void loop()
 {
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
+    Serial.print(F("Turning ON PIN:"));
+    Serial.println(zones[i]);    
     digitalWrite(zones[i], HIGH);   // sets the LED on
-    delay(500);                  // waits for a second
+    delay(1000);                  // waits for a second
     digitalWrite(zones[i], LOW);    // sets the LED off
   }
 }

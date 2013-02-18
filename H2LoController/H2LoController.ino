@@ -3,19 +3,54 @@
  created 04 Jan 2012
  by Franz Garsombke
  */
-#include "Structures.h"
 #include <SPI.h>
-//#include <Ethernet.h>
 #include <PubSubClient.h>
-#include <MemoryFree.h>
 #include <aJSON.h>
-#include <QueueArray.h> // http://playground.arduino.cc/Code/QueueArray
+#include <QueueArray.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <MemoryFree.h>
 
-// Enter a MAC address for your controller below.Newer Ethernet shields have a MAC address printed on a sticker on the shield??
-byte mac[] = {  0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
-//EthernetClient netClient;
+// MQTT
+#define MQTT_SERVER "ec2-50-17-66-9.compute-1.amazonaws.com"
+#define M2MIO_USERNAME   "device"
+#define M2MIO_PASSWORD   "D2afrEXeSWumech4daSP"
+#define M2MIO_DOMAIN     ""
+#define M2MIO_DEVICE_ID "arduino-h2lo-devicezzz"
+
+// Command codes
+const int CODE_CMD_NO_ACTION = 0;
+const int CODE_CMD_UPDATE_ZONE_STATUS = 1;
+const int CODE_CMD_RUN_ZONE_SCHEDULE = 2;
+const int ENSURE_CONNECTION_MILLIS = 30000;
+
+const int NO_SCHEDULE_RUNNING = 0;
+
+const int ZONE_STATUS_OFF = 0;
+const int ZONE_STATUS_ON = 1;
+
+// structure to hold JSON schedule
+struct Schedule
+{
+  int zoneNumber;
+  long duration;
+  int zoneStatus;
+};
+
+int pinStart = 22;
+// Zone
+int zone1 = pinStart++;
+int zone2 = pinStart++; 
+int zone3 = pinStart++; 
+int zone4 = pinStart++; 
+int zone5 = pinStart++; 
+int zone6 = pinStart++; 
+int zone7 = pinStart++; 
+int zone8 = pinStart; 
+int zones[] = {zone1, zone2, zone3, zone4, zone5, zone6, zone7, zone8};
+int zoneCount = 8;
+// Callback function header
+void callback(char* topic, byte* payload, unsigned int length);
 WiFiClient netClient;
 PubSubClient pubSubClient(MQTT_SERVER, 1883, callback, netClient);
 char ssid[] = "nintendo";          //  your network SSID (name) 
@@ -24,9 +59,6 @@ int status = WL_IDLE_STATUS;
 int zoneId;
 int currentCommand = CODE_CMD_NO_ACTION;
 long devicePIN = 0;
-// LED indicator pin variables
-int ledIndicator = 13;
-int ledState = LOW;
 unsigned long ledFlashTimer = 0;       // timer for LED in milliseconds
 unsigned long ledFlashInterval = 1000; // flash interval in milliseconds
 int commandRunningLength = 4;
@@ -45,40 +77,40 @@ char message_buff[200];
 unsigned long connect_alarm; // time of next connection check;
 boolean wifi_connected = false;
 
+// handles message arrived on subscribed topic(s)
+void callback(char* topic, byte* payload, unsigned int length) {
+  /*
+  Serial.print(F("length:"));
+  Serial.println(length);
+  Serial.print(F("topic:"));
+  Serial.println(topic);
+  */
+  int i = 0;  
+  // create character buffer with ending null terminator (string)
+  for(i=0; i<length; i++) {
+    message_buff[i] = payload[i];
+  }
+  message_buff[i] = '\0';
+  Serial.print(F("payload:"));
+  String jsonResponse = String(message_buff);
+  Serial.println(jsonResponse);
+  currentCommand = getCurrentCommand(String(topic));
+}
+
 void setup() {
   // start serial port:
   Serial.begin(9600);
-  // give the ethernet module time to boot up:
-  delay(1000);
-  Serial.print(F("Free:"));
-  Serial.println(getFreeMemory());  
-  initWiFi();
-  //IPAddress ip(192,168,1, 177);
-  //Ethernet.begin(mac, ip);
-  // give the Ethernet shield a second to initialize:
-  delay(2000);
   //Set relay pins to output
   for (int i = 0; i < zoneCount; i++){
     pinMode(zones[i], OUTPUT);
   }
   // clear the zones
   for (int i = 0; i < zoneCount; i++){
+    Serial.print(F("Clearing PIN:"));
+    Serial.println(zones[i]);
     digitalWrite(zones[i], LOW);
   }
-  // load EEPROM information
-  loadConfig();
-  Serial.print(F("Device PIN:"));
-  Serial.println(WiFiConfig.devicePIN);  
-  /* uncomment out to reset device PIN
-  WiFiConfig.devicePIN = 0;
-  saveConfig();
-  */
-  // set the global devicePIN
-  devicePIN = WiFiConfig.devicePIN;
-  Serial.print(F("after:"));
-  Serial.println(freeRam());
-  // reset all connections
-  ensure_connected();
+  devicePIN = 16807;
 }
 
 void loop() {
@@ -88,8 +120,6 @@ void loop() {
   // MQTT client loop processing
   pubSubClient.loop();
   delay(2000);
-  // Must be called from 'loop'. This will service all the events associated with the timer. - http://playground.arduino.cc/Code/Timer
-  //timer.update();    
   // This action is received from callback. If there is a command value, execute on it
   if(currentCommand != CODE_CMD_NO_ACTION) {
     runCurrentCommand();
@@ -113,29 +143,6 @@ void runSchedules() {
   }
 }
 
-// handles message arrived on subscribed topic(s)
-void callback(char* topic, byte* payload, unsigned int length) {
-  /*
-  Serial.print(F("length:"));
-  Serial.println(length);
-  Serial.print(F("topic:"));
-  Serial.println(topic);
-  */
-  int i = 0;  
-  // create character buffer with ending null terminator (string)
-  for(i=0; i<length; i++) {
-    message_buff[i] = payload[i];
-  }
-  message_buff[i] = '\0';
-  Serial.println(getFreeMemory());
-  /*
-  Serial.print(F("payload:"));
-  String jsonResponse = String(message_buff);
-  Serial.println(jsonResponse);
-  */
-  currentCommand = getCurrentCommand(String(topic));
-}
-
 void runCurrentCommand() {
   struct Schedule schedule = parseZoneJson(message_buff);
   switch (currentCommand) {
@@ -145,10 +152,8 @@ void runCurrentCommand() {
     case CODE_CMD_RUN_ZONE_SCHEDULE: // Run a whole zone schedule
       // put the schedule on the stack for processing
       scheduleStack.push(schedule);
-      /*
       Serial.print(F("stack size after push:"));
       Serial.println(scheduleStack.count());    
-      */
     break;
     default:
       Serial.print(F("Unsupported command."));
@@ -166,7 +171,7 @@ void changeZoneStatus(struct Schedule schedule) {
     Should we clear out the schedule stack if we get these manual controls?
    * 
    */
-  //Serial.println(F("changing zone status"));
+  Serial.println(F("changing zone status"));
   if (schedule.zoneStatus == ZONE_STATUS_ON) {
     // start a timed run with zone and duration information
     startTimedRun(schedule.zoneNumber, schedule.duration);
@@ -197,18 +202,14 @@ void startTimedRun(int zone, unsigned long seconds){
   endTimedRun();
   // select pin (shift object id to base zero):
   int pin = zones[zone - 1];
-  /*
+  
   Serial.print(F("requesting run for zone#:"));
   Serial.println(zone);
   Serial.print(F("starting run on pin:"));
   Serial.println(pin);
-  */
+  
   // turn on selected zone
   digitalWrite(pin, HIGH);
-  // turn on the LED indicator light
-  digitalWrite(ledIndicator, HIGH);  // set the LED on
-  ledFlashTimer = millis() + 10000;   // set the timer
-  ledState = HIGH;                   // set the state
   // set commandRunning parameters
   commandRunning[CR_ZONE_ID] = zone;
   commandRunning[CR_PIN_ID] = pin; //BUG?: int to unsigned long?
@@ -227,20 +228,7 @@ void checkTimedRun(){
     if (millis() >= commandRunning[CR_END_TIME]){
       // close valve: stop zone X
       endTimedRun();
-    } else {
-    // Flash the LED
-    if (millis() >= ledFlashTimer){
-      if (ledState == LOW){
-        ledState = HIGH;
-      } else {
-        ledState = LOW;
-      }
-      // Change the LED state
-      digitalWrite(ledIndicator, ledState);
-      // reset the timer for the next state change
-      ledFlashTimer = millis() + ledFlashInterval;
     }
-   }
   }
 }
 
@@ -249,16 +237,12 @@ void endTimedRun(){
   if(commandRunning[CR_ZONE_ID] == CODE_CMD_NO_ACTION) {
     return;
   }
-  /*
+  
   Serial.print(F("deactivating zone:"));
   Serial.println(commandRunning[CR_ZONE_ID]);
-  */
+  
   // turn off the pin for the active zone
   digitalWrite(commandRunning[CR_PIN_ID], LOW);
-  // turn off the LED indicator
-  digitalWrite(ledIndicator, LOW);    // set the LED off
-  ledState = LOW;                     // reset the state
-  ledFlashTimer = 0;                  // reset the timer
   // send a message to the cloud that a zone status has changed
   publishZoneChangeMessage(commandRunning[CR_ZONE_ID], ZONE_STATUS_OFF);  
   // clear the commandRunning array
@@ -276,34 +260,6 @@ void publishHeartbeat() {
   Serial.print(F("publish topic:"));
   Serial.println(publishTopic);
   pubSubClient.publish(publishTopic, pubMsg);  
-}
-
-void subscribe(char* email) {
-  if(strlen(email) > 0) {
-    char subscriptionPublishTopic[50];
-    Serial.print(F("publish message:"));
-    Serial.println(email); 
-    String publishTopicStr = "h2lo/";
-    long randNumber = random(500000);
-    publishTopicStr.concat("cloud/");
-    publishTopicStr.concat(randNumber);
-    publishTopicStr.concat("/SUBSCRIBE");
-    publishTopicStr.toCharArray(subscriptionPublishTopic, publishTopicStr.length()+1); 
-    Serial.print(F("publish topic:"));
-    Serial.println(subscriptionPublishTopic);
-    pubSubClient.publish(subscriptionPublishTopic, email);
-
-    // persist the device id    
-    WiFiConfig.devicePIN = randNumber;
-    saveConfig();
-    // set the global PIN
-    devicePIN = WiFiConfig.devicePIN;
-
-    subscribeToTopic();
-    
-    // Now we clear our array
-    memset( email, 0, sizeof(email) );    
-  }
 }
 
 void subscribeToTopic() {
@@ -325,8 +281,13 @@ void subscribeToTopic() {
 void ensure_connected() {
   static int failureCountMQTT = 0;
   static int failureCountWiFi = 0;
-  Serial.println(F("Ensuring connection."));
-  connect_alarm = millis() + 30000;
+  static int ensureConnectionCount = 0;
+  ensureConnectionCount++;
+  Serial.print(F("Free RAM:"));
+  Serial.println(freeRam());
+  Serial.print(F("Ensure connection count:"));
+  Serial.println(ensureConnectionCount);
+  connect_alarm = millis() + ENSURE_CONNECTION_MILLIS;
   if (!pubSubClient.connected()) {   
     Serial.print(F("failureCountMQTT:"));
     Serial.println(failureCountMQTT);
@@ -337,7 +298,9 @@ void ensure_connected() {
       failureCountWiFi++;
       initWiFi();
     }
-    mqtt_connect();
+    if (wifi_connected) {
+      mqtt_connect();
+    }
   } else {
     publishHeartbeat();
   }
@@ -362,13 +325,77 @@ void initWiFi() {
 }
 
 void mqtt_connect() {
-    Serial.println(F("Connecting to MQTT Broker..."));
-    if (pubSubClient.connect(M2MIO_DEVICE_ID, M2MIO_USERNAME, M2MIO_PASSWORD)) {
-      Serial.println(F("Connected to MQTT"));
-      subscribeToTopic();
-      // tell everyone we are alive!
-      publishHeartbeat();
-    } else {
-      Serial.println(F("Failed connecting to MQTT"));
+  Serial.println(F("Connecting to MQTT Broker..."));
+  if (pubSubClient.connect(M2MIO_DEVICE_ID, M2MIO_USERNAME, M2MIO_PASSWORD)) {
+    Serial.println(F("Connected to MQTT"));
+    subscribeToTopic();
+    // tell everyone we are alive!
+    publishHeartbeat();
+  } else {
+    Serial.println(F("Failed connecting to MQTT"));
+  }
+}
+
+void clearCommandRunning(){
+  for (int i = 0; i < commandRunningLength; i++){
+    commandRunning[i] = 0;
+  }
+}
+
+int freeRam () {
+  extern int __heap_start, *__brkval;
+  int v;
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval);
+}
+
+int getCurrentCommand(String topic) {
+  int command = topic.substring(topic.lastIndexOf('/') +1,topic.length()).toInt();
+  /*
+  Serial.print(F("command:"));
+  Serial.println(command);
+  */
+  return command;
+}
+
+
+char* retrieveZoneStatusJson(int zoneNumber, int zoneStatus) {
+  aJsonObject *root = aJson.createObject();
+  aJson.addNumberToObject(root,"z", zoneNumber);
+  aJson.addNumberToObject(root,"s", zoneStatus);
+  char* json_string = aJson.print(root);
+  // clean up the resources
+  aJson.deleteItem(root);
+  return json_string;
+}
+
+Schedule parseZoneJson(char *jsonString) {
+  struct Schedule schedule;
+  aJsonObject* root = aJson.parse(jsonString);
+  if (root != NULL) {
+    //Serial.println("Parsed successfully Root " );
+    aJsonObject* zone = aJson.getObjectItem(root, "z"); 
+    if (zone != NULL) {
+      //Serial.println("Parsed successfully zone" );
+      schedule.zoneNumber = zone->valueint;
+      Serial.print(F("zone:"));
+      Serial.println(schedule.zoneNumber);
     }
+    aJsonObject* duration = aJson.getObjectItem(root, "d"); 
+    if (duration != NULL) {
+      //Serial.println("Parsed successfully duration" );
+      schedule.duration = duration->valueint;
+      Serial.print(F("duration:"));
+      Serial.println(schedule.duration);
+    }        
+    aJsonObject* zoneStatus = aJson.getObjectItem(root, "s"); 
+    if (zoneStatus != NULL) {
+      //Serial.println("Parsed successfully duration" );
+      schedule.zoneStatus = zoneStatus->valueint;
+      Serial.print(F("zoneStatus:"));
+      Serial.println(schedule.zoneStatus);
+    }     
+  }
+  // This deletes the objects and all values referenced by it.  
+  aJson.deleteItem(root);
+  return schedule;
 }
