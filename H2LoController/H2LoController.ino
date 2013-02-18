@@ -15,7 +15,6 @@
 #define MQTT_SERVER "ec2-50-17-66-9.compute-1.amazonaws.com"
 #define M2MIO_USERNAME   "device"
 #define M2MIO_PASSWORD   "D2afrEXeSWumech4daSP"
-#define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-devicezzz"
 
 // Command codes
@@ -91,9 +90,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
     message_buff[i] = payload[i];
   }
   message_buff[i] = '\0';
+  /*
   Serial.print(F("payload:"));
   String jsonResponse = String(message_buff);
   Serial.println(jsonResponse);
+  */
   currentCommand = getCurrentCommand(String(topic));
 }
 
@@ -152,8 +153,8 @@ void runCurrentCommand() {
     case CODE_CMD_RUN_ZONE_SCHEDULE: // Run a whole zone schedule
       // put the schedule on the stack for processing
       scheduleStack.push(schedule);
-      Serial.print(F("stack size after push:"));
-      Serial.println(scheduleStack.count());    
+      //Serial.print(F("stack size after push:"));
+      //Serial.println(scheduleStack.count());    
     break;
     default:
       Serial.print(F("Unsupported command."));
@@ -171,7 +172,7 @@ void changeZoneStatus(struct Schedule schedule) {
     Should we clear out the schedule stack if we get these manual controls?
    * 
    */
-  Serial.println(F("changing zone status"));
+  //Serial.println(F("changing zone status"));
   if (schedule.zoneStatus == ZONE_STATUS_ON) {
     // start a timed run with zone and duration information
     startTimedRun(schedule.zoneNumber, schedule.duration);
@@ -202,12 +203,12 @@ void startTimedRun(int zone, unsigned long seconds){
   endTimedRun();
   // select pin (shift object id to base zero):
   int pin = zones[zone - 1];
-  
+  /*
   Serial.print(F("requesting run for zone#:"));
   Serial.println(zone);
   Serial.print(F("starting run on pin:"));
   Serial.println(pin);
-  
+  */
   // turn on selected zone
   digitalWrite(pin, HIGH);
   // set commandRunning parameters
@@ -237,10 +238,10 @@ void endTimedRun(){
   if(commandRunning[CR_ZONE_ID] == CODE_CMD_NO_ACTION) {
     return;
   }
-  
+  /*
   Serial.print(F("deactivating zone:"));
   Serial.println(commandRunning[CR_ZONE_ID]);
-  
+  */
   // turn off the pin for the active zone
   digitalWrite(commandRunning[CR_PIN_ID], LOW);
   // send a message to the cloud that a zone status has changed
@@ -257,8 +258,8 @@ void publishHeartbeat() {
   publishTopicStr.concat(devicePIN);
   publishTopicStr.concat("/HEARTBEAT");
   publishTopicStr.toCharArray(publishTopic, publishTopicStr.length()+1); 
-  Serial.print(F("publish topic:"));
-  Serial.println(publishTopic);
+  //Serial.print(F("publish topic:"));
+  //Serial.println(publishTopic);
   pubSubClient.publish(publishTopic, pubMsg);  
 }
 
@@ -269,8 +270,8 @@ void subscribeToTopic() {
   subscribeTopicStr.concat(devicePIN);
   subscribeTopicStr.concat("/+");
   subscribeTopicStr.toCharArray(subscribeTopic, subscribeTopicStr.length()+1);
-  Serial.print(F("subscribe:"));
-  Serial.println(subscribeTopic);
+  //Serial.print(F("subscribe:"));
+  //Serial.println(subscribeTopic);
   pubSubClient.subscribe(subscribeTopic);  
 }
 
@@ -283,8 +284,8 @@ void ensure_connected() {
   static int failureCountWiFi = 0;
   static int ensureConnectionCount = 0;
   ensureConnectionCount++;
-  Serial.print(F("Free RAM:"));
-  Serial.println(freeRam());
+  //Serial.print(F("Free RAM:"));
+  //Serial.println(freeRam());
   Serial.print(F("Ensure connection count:"));
   Serial.println(ensureConnectionCount);
   connect_alarm = millis() + ENSURE_CONNECTION_MILLIS;
@@ -377,22 +378,22 @@ Schedule parseZoneJson(char *jsonString) {
     if (zone != NULL) {
       //Serial.println("Parsed successfully zone" );
       schedule.zoneNumber = zone->valueint;
-      Serial.print(F("zone:"));
-      Serial.println(schedule.zoneNumber);
+      //Serial.print(F("zone:"));
+      //Serial.println(schedule.zoneNumber);
     }
     aJsonObject* duration = aJson.getObjectItem(root, "d"); 
     if (duration != NULL) {
       //Serial.println("Parsed successfully duration" );
       schedule.duration = duration->valueint;
-      Serial.print(F("duration:"));
-      Serial.println(schedule.duration);
+      //Serial.print(F("duration:"));
+      //Serial.println(schedule.duration);
     }        
     aJsonObject* zoneStatus = aJson.getObjectItem(root, "s"); 
     if (zoneStatus != NULL) {
       //Serial.println("Parsed successfully duration" );
       schedule.zoneStatus = zoneStatus->valueint;
-      Serial.print(F("zoneStatus:"));
-      Serial.println(schedule.zoneStatus);
+      //Serial.print(F("zoneStatus:"));
+      //Serial.println(schedule.zoneStatus);
     }     
   }
   // This deletes the objects and all values referenced by it.  

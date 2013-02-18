@@ -15,7 +15,6 @@
 */
 
 #include <SPI.h>
-#include <Ethernet.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -26,7 +25,6 @@ byte mac[]    = {  0xDE, 0xED, 0xBA, 0xFE, 0xFE, 0xED };
 #define MQTT_SERVER "ec2-50-17-66-9.compute-1.amazonaws.com"
 #define M2MIO_USERNAME   "device"
 #define M2MIO_PASSWORD   "D2afrEXeSWumech4daSP"
-#define M2MIO_DOMAIN     ""
 #define M2MIO_DEVICE_ID "arduino-h2lo-deviceXXX"
 char ssid[] = "nintendo";          //  your network SSID (name) 
 char pass[] = "7ustESTenedr";   // your network password
@@ -41,7 +39,6 @@ char* jsonString = "{\"d\":2,\"z\":1,\"s\":10}";
 // Callback function header
 void callback(char* topic, byte* payload, unsigned int length);
 
-//EthernetClient netClient;
 WiFiClient netClient;
 PubSubClient client(MQTT_SERVER, 1883, callback, netClient);
 
@@ -70,10 +67,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void setup() {
   // start serial port:
   Serial.begin(9600);
-  //IPAddress ip(192,168,1, 177);
-  //Ethernet.begin(mac, ip);
-  // give the ethernet module time to boot up:
-  //delay(1000);
 }
 
 void loop() {
